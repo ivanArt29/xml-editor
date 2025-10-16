@@ -46,3 +46,6 @@ docker compose up --build tests
 - `file_loader.py` — загрузка файлов
 - `exporter.py` — экспорт HTML/PDF
 - `start_vnc.sh` — Xvfb + VNC/noVNC
+
+## Автор
+Выполнено Артемовым И.А.
