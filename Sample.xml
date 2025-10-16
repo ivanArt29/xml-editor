@@ -1,0 +1,13 @@
+<?xml version="1.0" ?>
+<Data>
+  <Person>
+    <Name>Andrew</Name>
+  </Person>
+  <City>
+    <Name>Moscow</Name>
+    <Coords>45.67</Coords>
+  </City>
+  <Job>
+    <Name>Engineer</Name>
+  </Job>
+</Data>

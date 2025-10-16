@@ -1,0 +1,17 @@
+.git
+.gitignore
+__pycache__
+.pytest_cache
+*.pyc
+*.pyo
+*.pyd
+*.log
+dist
+build
+venv
+.venv
+*.pdf
+*.html
+*.xml
+*.ini
+

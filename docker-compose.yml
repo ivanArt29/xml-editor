@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  tests:
+    build: .
+    environment:
+      - QT_QPA_PLATFORM=offscreen
+    volumes:
+      - ./:/app
+    working_dir: /app
+    command: bash -lc "xvfb-run -a pytest -q"
+
+  app-x11:
+    build: .
+    environment:
+      - DISPLAY=${DISPLAY}
+    volumes:
+      - ./:/app
+      - /tmp/.X11-unix:/tmp/.X11-unix:ro
+    working_dir: /app
+    command: bash -lc "python main.py"
+
+  app-x11-win:
+    build: .
+    environment:
+      - DISPLAY=host.docker.internal:0.0
+      - QT_QPA_PLATFORM=xcb
+      - QT_X11_NO_MITSHM=1
+    volumes:
+      - ./:/app
+    working_dir: /app
+    command: bash -lc "python main.py"
+
+  app-vnc:
+    build: .
+    environment:
+      - SCREEN_GEOMETRY=1366x768x24
+    volumes:
+      - ./:/app
+    working_dir: /app
+    ports:
+      - "5900:5900"   # VNC
+      - "6080:6080"   # noVNC (web)
+    command: bash -lc "/app/start_vnc.sh"
+
