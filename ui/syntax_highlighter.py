@@ -10,27 +10,21 @@ class XmlHighlighter(QSyntaxHighlighter):
 
         self.rules = []
 
-        # Храним форматы как поля, чтобы менять цвета на лету(подсветку можно изменить без пересоздания хайлайтера и перезагрузки текста)
+        
         self.tag_format = QTextCharFormat()
-        self.tag_format.setForeground(QColor(0, 102, 204))  # по умолчанию синий
-        self.tag_format.setFontWeight(QFont.Bold)  # Делаем открывающие теги тоже жирными
+        self.tag_format.setFontWeight(QFont.Bold)
 
         attr_name_format = QTextCharFormat()
-        attr_name_format.setForeground(QColor(153, 0, 153))  # фиолетовый
 
         attr_value_format = QTextCharFormat()
-        attr_value_format.setForeground(QColor(0, 128, 0))  # зелёный
 
         comment_format = QTextCharFormat()
-        comment_format.setForeground(QColor(128, 128, 128))  # серый
         comment_format.setFontItalic(True)
 
         decl_format = QTextCharFormat()
-        decl_format.setForeground(QColor(153, 76, 0))  # коричневый
         decl_format.setFontWeight(QFont.Bold)
 
         entity_format = QTextCharFormat()
-        entity_format.setForeground(QColor(204, 0, 0))  # красный
 
         # Паттерны подсветки (регулярные выражения)
         #Закрывающие теги

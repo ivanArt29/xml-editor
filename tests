@@ -31,7 +31,7 @@ def stub_dialogs(monkeypatch):
     # Отключаем диалоги сохранения
     def mock_confirm_save_if_dirty(self):
         return True
-    monkeypatch.setattr("main.XMLEditor.confirm_save_if_dirty", mock_confirm_save_if_dirty)
+    monkeypatch.setattr("Editor.XMLEditor.confirm_save_if_dirty", mock_confirm_save_if_dirty)
 
 
 @pytest.fixture
@@ -54,6 +54,7 @@ def test_editor_has_components(editor):
     """Тест: у редактора есть все нужные компоненты"""
     assert editor.editor is not None  # текстовое поле
     assert editor.tree is not None    # дерево XML
+    assert editor.toolbar is not None  # панель инструментов
     assert editor.status_bar is not None  # статусная строка
 
 

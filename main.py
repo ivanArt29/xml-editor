@@ -5,15 +5,16 @@ import xml.dom.minidom as minidom
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QPlainTextEdit, QVBoxLayout, 
                              QWidget, QToolBar, QAction, QFileDialog, 
                              QMessageBox, QLabel, QStatusBar, QColorDialog, QTreeWidget, QTreeWidgetItem, QSplitter, QComboBox, QFontComboBox, QAbstractItemView, QProgressBar, QStyle)
-from PyQt5.QtGui import QFont, QPalette, QColor, QTextCursor
+from PyQt5.QtGui import QFont, QPalette, QColor, QTextCursor, QIcon
 from PyQt5.QtCore import Qt, QSettings, QThread, pyqtSignal
 from PyQt5.QtGui import QTextOption
 from PyQt5.QtPrintSupport import QPrintDialog, QPrinter
-from syntax_highlighter import XmlHighlighter
-from settings_dialog import SettingsDialog
+from ui.syntax_highlighter import XmlHighlighter
+from ui.settings_dialog import SettingsDialog
 from PyQt5.QtWidgets import QDialog
-from tree_builder import TreeBuilderThread, ElementTreeBuilderThread
-from file_loader import FileLoaderThread
+from threads.tree_builder import TreeBuilderThread, ElementTreeBuilderThread
+from threads.file_loader import FileLoaderThread
+from ui.ui_builder import UIBuilder
 
 class XMLEditor(QMainWindow):
     """Главное окно XML-редактора: редактор текста, дерево, меню и действия."""
@@ -30,64 +31,20 @@ class XMLEditor(QMainWindow):
         self._tree_builder_thread = None
         self._file_loader_thread = None
         self._progress_bar = None
-        self.init_ui()
-        self.load_settings()
-        
-    def init_ui(self):
-        """Создаёт и настраивает виджеты, панели, меню и статус-бар."""
-        self.setWindowTitle("Текстовый XML-редактор")
-        self.setGeometry(100, 100, 1200, 800)
-        # Иконка окна
-        self.setWindowIcon(self.style().standardIcon(QStyle.SP_FileIcon))
-        
-        # Создаем сплиттер с деревом и редактором
-        self.splitter = QSplitter(self)
-        self.tree = QTreeWidget()
-        self.tree.setHeaderLabels(["Элемент", "Значение", "Атрибуты"])
-        # По умолчанию делаем столбец атрибутов шире
-        self.tree.setColumnWidth(2, 300)
-        self.tree.itemClicked.connect(self.on_tree_item_clicked)
-        self.tree.itemChanged.connect(self.on_tree_item_changed)
-        self.tree.setEditTriggers(QAbstractItemView.DoubleClicked | QAbstractItemView.SelectedClicked | QAbstractItemView.EditKeyPressed)
-        self.tree.itemExpanded.connect(self.on_item_expanded)
-        self.create_editor()
-        self.splitter.addWidget(self.tree)
-        self.splitter.addWidget(self.editor)
-        self.splitter.setStretchFactor(0, 0)
-        self.splitter.setStretchFactor(1, 1)
-        # Шире панель дерева по умолчанию
-        self.splitter.setSizes([500, 700])
-        # Центральная область — старый сплиттер
-        self.setCentralWidget(self.splitter)
-
-        # Создание панелей инструментов
-        self.create_toolbar()
-        self.create_xml_toolbar()
-        self.create_tree_actions()
-
-        # Меню/действие Настройки
-        self.settings_action = QAction("Настройки", self)
-        self.settings_action.setShortcut("Ctrl+,")
-        self.settings_action.triggered.connect(self.open_settings_dialog)
-
-        # Недавние файлы (до создания меню)
+        # Инициализация недавних файлов (до создания меню)
         self.recent_files = []
         self._load_recent_files()
-
-        # Создаем меню
-        self.create_menus()
-
-        # Создание статусной строки
-        self.status_bar = QStatusBar()
-        self.setStatusBar(self.status_bar)
-        self.status_bar.showMessage("Готово")
         
-        # Создание прогресс-бара для больших файлов
-        self._progress_bar = QProgressBar()
-        self._progress_bar.setVisible(False)
-        self.status_bar.addPermanentWidget(self._progress_bar)
-        # Инициализируем заголовок с актуальным состоянием
-        self._refresh_window_title()
+        # Создаем UI через отдельный модуль
+        self.ui_builder = UIBuilder(self)
+        self.ui_builder.setup_main_window()
+        self.ui_builder.create_central_widget()
+        self.ui_builder.create_toolbars()
+        self.ui_builder.create_menus()
+        self.ui_builder.create_status_bar()
+        
+        self.load_settings()
+        
 
     def _refresh_window_title(self):
         """Обновляет заголовок окна и добавляет '*' при несохранённых изменениях."""
@@ -96,158 +53,7 @@ class XMLEditor(QMainWindow):
         star = "*" if self.is_dirty else ""
         self.setWindowTitle(f"{star}{base} - {name}")
 
-    def create_toolbar(self):
-        """Создаёт основную панель инструментов и её действия."""
-        self.toolbar = QToolBar("Основные инструменты")
-        self.toolbar.setToolButtonStyle(Qt.ToolButtonTextOnly)
-        
-        # Действия для файлов
-        self.new_action = QAction("Новый", self)
-        self.new_action.setShortcut("Ctrl+N")
-        self.new_action.triggered.connect(self.new_file)
-        
-        self.open_action = QAction("Открыть", self)
-        self.open_action.setShortcut("Ctrl+O")
-        self.open_action.triggered.connect(self.open_file)
-        
-        self.save_action = QAction("Сохранить", self)
-        self.save_action.setShortcut("Ctrl+S")
-        self.save_action.triggered.connect(self.save_file)
-        
-        self.save_as_action = QAction("Сохранить как", self)
-        self.save_as_action.setShortcut("Ctrl+Shift+S")
-        self.save_as_action.triggered.connect(self.save_as_file)
-        
-        self.print_action = QAction("Печать", self)
-        self.print_action.setShortcut("Ctrl+P")
-        self.print_action.triggered.connect(self.print_file)
 
-        self.export_html_action = QAction("Экспорт в HTML", self)
-        self.export_html_action.triggered.connect(self.export_to_html)
-
-        self.export_pdf_action = QAction("Экспорт в PDF", self)
-        self.export_pdf_action.triggered.connect(self.export_to_pdf)
-        
-        # Добавляем действия на панель
-        self.toolbar.addAction(self.new_action)
-        self.toolbar.addAction(self.open_action)
-        self.toolbar.addAction(self.save_action)
-        self.toolbar.addAction(self.save_as_action)
-        self.toolbar.addSeparator()
-        self.toolbar.addAction(self.print_action)
-        self.toolbar.addSeparator()
-        self.toolbar.addAction(self.export_html_action)
-        self.toolbar.addAction(self.export_pdf_action)
-
-        self.addToolBar(Qt.TopToolBarArea, self.toolbar)
-        
-    def create_xml_toolbar(self):
-        """Создаёт панель инструментов для операций с XML."""
-        self.xml_toolbar = QToolBar("XML")
-        self.xml_toolbar.setToolButtonStyle(Qt.ToolButtonTextOnly)
-
-        self.validate_action = QAction("Проверить XML", self)
-        self.validate_action.setShortcut("F7")
-        self.validate_action.triggered.connect(self.validate_xml)
-
-        self.pretty_action = QAction("Форматировать XML", self)
-        self.pretty_action.setShortcut("Ctrl+Shift+F")
-        self.pretty_action.triggered.connect(self.pretty_format_xml)
-
-        self.wrap_action = QAction("Перенос строк", self)
-        self.wrap_action.setCheckable(True)
-        self.wrap_action.setChecked(False)
-        self.wrap_action.toggled.connect(self.toggle_word_wrap)
-
-        self.xml_toolbar.addAction(self.validate_action)
-        self.xml_toolbar.addAction(self.pretty_action)
-        self.xml_toolbar.addSeparator()
-        self.xml_toolbar.addAction(self.wrap_action)
-
-        self.addToolBar(Qt.TopToolBarArea, self.xml_toolbar)
-
-    def create_tree_actions(self):
-        """Создаёт панель инструментов для управления деревом XML."""
-        self.tree_toolbar = QToolBar("Структура")
-        self.tree_toolbar.setToolButtonStyle(Qt.ToolButtonTextOnly)
-
-        self.toggle_tree_action = QAction("Показать/скрыть дерево", self)
-        self.toggle_tree_action.setCheckable(True)
-        self.toggle_tree_action.setChecked(True)
-        self.toggle_tree_action.toggled.connect(self.toggle_tree)
-
-        self.refresh_tree_action = QAction("Обновить дерево", self)
-        self.refresh_tree_action.setShortcut("F5")
-        self.refresh_tree_action.triggered.connect(self.build_tree_from_editor)
-
-        self.tree_toolbar.addAction(self.toggle_tree_action)
-        self.tree_toolbar.addAction(self.refresh_tree_action)
-        self.addToolBar(Qt.TopToolBarArea, self.tree_toolbar)
-
-    
-    
-    def create_menus(self):
-        """Создаёт строки меню, их пункты и подменю."""
-        menubar = self.menuBar()
-        # Файл
-        self.file_menu = menubar.addMenu("Файл")
-        self.file_menu.addAction(self.new_action)
-        self.file_menu.addAction(self.open_action)
-        self.file_menu.addSeparator()
-        self.file_menu.addAction(self.save_action)
-        self.file_menu.addAction(self.save_as_action)
-
-        # Недавние файлы
-        self.recent_menu = self.file_menu.addMenu("Недавние файлы")
-        self._rebuild_recent_menu()
-
-        self.file_menu.addSeparator()
-        self.file_menu.addAction(self.print_action)
-        # Закрытие
-        exit_action = QAction("Закрыть", self)
-        exit_action.setShortcut("Ctrl+Q")
-        exit_action.triggered.connect(self.close)
-        self.file_menu.addSeparator()
-        self.file_menu.addAction(exit_action)
-
-        # Экспорт
-        export_menu = menubar.addMenu("Экспорт")
-        export_menu.addAction(self.export_html_action)
-        export_menu.addAction(self.export_pdf_action)
-
-        # Правка (единый пункт «Найти и заменить...» с диалогом)
-        edit_menu = menubar.addMenu("Правка")
-        self.find_replace_action = QAction("Найти и заменить...", self)
-        self.find_replace_action.setShortcut("Ctrl+F")
-        self.find_replace_action.triggered.connect(self.open_find_dialog)
-        edit_menu.addAction(self.find_replace_action)
-
-        # XML
-        xml_menu = menubar.addMenu("XML")
-        xml_menu.addAction(self.validate_action)
-        xml_menu.addAction(self.pretty_action)
-        xml_menu.addSeparator()
-        xml_menu.addAction(self.wrap_action)
-
-        # Структура
-        structure_menu = menubar.addMenu("Структура")
-        structure_menu.addAction(self.toggle_tree_action)
-        structure_menu.addAction(self.refresh_tree_action)
-
-        # Настройки
-        settings_menu = menubar.addMenu("Настройки")
-        settings_menu.addAction(self.settings_action)
-        
-        # О программе
-        about_menu = menubar.addMenu("О программе")
-        self.about_action = QAction("О программе", self)
-        self.about_action.triggered.connect(self.show_about_dialog)
-        about_menu.addAction(self.about_action)
-
-        # Скрыть панели инструментов (убрать дублирование кнопок)
-        self.toolbar.setVisible(False)
-        self.xml_toolbar.setVisible(False)
-        self.tree_toolbar.setVisible(False)
 
     def open_find_dialog(self):
         # Модальное окно поиска/замены, как в блокноте
@@ -340,18 +146,6 @@ class XMLEditor(QMainWindow):
         dlg.resize(600, 140)
         dlg.show()
         
-    def create_editor(self):
-        """Создаёт основной текстовый редактор и подключает подсветку."""
-        self.editor = QPlainTextEdit()
-        self.editor.textChanged.connect(self.on_text_changed)
-        self.editor.cursorPositionChanged.connect(self.update_status)
-        self.editor.setWordWrapMode(QTextOption.NoWrap)
-        
-        # Начальные настройки по умолчанию; будут переопределены из настроек
-        self.editor.setFont(QFont("Consolas", 12))
-
-        # Подсветка синтаксиса XML
-        self.highlighter = XmlHighlighter(self.editor.document())
 
     def _build_search_tab(self, parent_widget):
         from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QLineEdit, QPushButton, QCheckBox, QLabel
@@ -552,7 +346,7 @@ class XMLEditor(QMainWindow):
 
     def export_to_html(self):
         """Экспортирует текущий текст как HTML"""
-        from exporter import export_to_html as _export_to_html
+        from export.exporter import export_to_html as _export_to_html
         file_path, _ = QFileDialog.getSaveFileName(
             self, "Экспорт в HTML", "", "HTML Files (*.html);;All Files (*)")
         if not file_path:
@@ -572,7 +366,7 @@ class XMLEditor(QMainWindow):
 
     def export_to_pdf(self):
         """Экспортирует текущий документ в PDF через систему печати."""
-        from exporter import export_to_pdf as _export_to_pdf
+        from export.exporter import export_to_pdf as _export_to_pdf
         file_path, _ = QFileDialog.getSaveFileName(
             self, "Экспорт в PDF", "", "PDF Files (*.pdf);;All Files (*)")
         if not file_path:
@@ -1156,7 +950,16 @@ class XMLEditor(QMainWindow):
         # Заголовок с иконкой
         header = QHBoxLayout()
         icon_lbl = QLabel()
-        app_icon = self.style().standardIcon(QStyle.SP_FileIcon)
+        # Используем нашу красивую иконку
+        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app_icon.ico")
+        if os.path.exists(icon_path):
+            app_icon = QIcon(icon_path)
+        else:
+            png_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "app_icon.png")
+            if os.path.exists(png_path):
+                app_icon = QIcon(png_path)
+            else:
+                app_icon = self.style().standardIcon(QStyle.SP_FileIcon)
         icon_lbl.setPixmap(app_icon.pixmap(64, 64))
         icon_lbl.setFixedSize(64, 64)
         header.addWidget(icon_lbl)
