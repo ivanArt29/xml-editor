@@ -99,7 +99,6 @@ python -m venv .venv
    - PyQt5==5.15.9
    - pytest==8.3.2
    - pytest-qt==4.4.0
-   - mypy==1.11.1
 
 ### 5) Запуск программы
 
@@ -144,12 +143,7 @@ pytest -v
 pytest test_editor.py::test_function_name
 ```
 
-### Проверка типов (mypy)
-```bash
-mypy main.py
-mypy tree_builder.py
-mypy syntax_highlighter.py
-```
+
 
 ## 🗂️ Структура проекта
 
